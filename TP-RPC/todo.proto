@@ -11,6 +11,7 @@ service TodoService {
   rpc UpdateProduct (UpdateProductRequest) returns (ProductResponse);
   rpc DeleteProduct (DeleteProductRequest) returns (ProductResponse);
   rpc ListProducts (Empty) returns (ProductList);
+  rpc GetProduct (GetProductRequest) returns (GetProductResponse);
 }
 
 // Messages
@@ -62,4 +63,14 @@ message UpdateProductRequest {
 
 message DeleteProductRequest {
   string id = 1;
+}
+
+// Nouvelle méthode pour récupérer un produit par son ID
+message GetProductRequest {
+  string id = 1;  // L'ID du produit à récupérer
+}
+
+message GetProductResponse {
+  Product product = 1;  // Le produit récupéré
+  string error_message = 2;  // Message d'erreur si le produit n'existe pas
 }

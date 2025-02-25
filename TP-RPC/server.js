@@ -1,6 +1,7 @@
 const grpc = require('@grpc/grpc-js');
 const protoLoader = require('@grpc/proto-loader');
 const { MongoClient, ObjectId } = require('mongodb');
+const fs = require('fs');
 
 const PROTO_PATH = './todo.proto';
 const MONGO_URL = 'mongodb://localhost:27017';
@@ -9,6 +10,18 @@ const COLLECTION_NAME = 'products';
 
 const packageDefinition = protoLoader.loadSync(PROTO_PATH);
 const todoProto = grpc.loadPackageDefinition(packageDefinition).todo;
+
+const serverCert = fs.readFileSync('certs/server.crt');
+const serverKey = fs.readFileSync('certs/server.key');
+
+const credentials = grpc.ServerCredentials.createSsl(
+  null, 
+  [{
+      cert_chain: serverCert,
+      private_key: serverKey
+  }]
+);
+
 
 // Connectez-vous à MongoDB
 let db;
@@ -59,12 +72,25 @@ const deleteProduct = async (call, callback) => {
   }
 };
 
-const listProducts = async (call, callback) => {
+// Nouvelle méthode : getProduct
+const getProduct = async (call, callback) => {
+  const { id } = call.request;
+
   try {
-    const products = await db.collection(COLLECTION_NAME).find().toArray();
-    callback(null, { products });
+    const product = await db.collection(COLLECTION_NAME).findOne({ _id: new ObjectId(id) });
+
+    if (!product) {
+      callback({
+        code: grpc.status.INVALID_ARGUMENT,
+        message: `Product with ID ${id} not found`,
+      });
+      return;
+    }
+
+    // Si le produit existe, renvoyer le produit
+    callback(null, { product });
   } catch (err) {
-    callback({ code: grpc.status.INTERNAL, message: 'Failed to fetch products' });
+    callback({ code: grpc.status.INTERNAL, message: 'Failed to fetch product' });
   }
 };
 
@@ -74,9 +100,9 @@ server.addService(todoProto.TodoService.service, {
   addProduct,
   updateProduct,
   deleteProduct,
-  listProducts,
+  getProduct,  // Ajouter la méthode getProduct
 });
-server.bindAsync('0.0.0.0:50051', grpc.ServerCredentials.createInsecure(), () => {
+server.bindAsync('0.0.0.0:50051', credentials, () => {
   console.log('Server running on http://0.0.0.0:50051');
   server.start();
 });
